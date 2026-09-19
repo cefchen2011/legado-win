@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>legado 阅读 · Windows</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div id="app">
+  <header class="topbar">
+    <div class="brand">legado <span>Windows</span></div>
+    <nav>
+      <button class="nav-btn active" data-view="shelf">书架</button>
+      <button class="nav-btn" data-view="explore">发现</button>
+      <button class="nav-btn" data-view="search">搜索</button>
+      <button class="nav-btn" data-view="source">书源</button>
+      <button class="nav-btn" data-view="replace">净化</button>
+      <button class="nav-btn" data-view="rss">订阅</button>
+      <button class="nav-btn" data-view="sync">同步</button>
+      <button class="nav-btn" data-view="theme">主题</button>
+      <button class="nav-btn" data-view="history">历史</button>
+    </nav>
+    <div class="stat" id="stat">…</div>
+  </header>
+  <!-- 书架 -->
+  <main class="view active" id="view-shelf">
+    <div class="toolbar">
+      <span id="shelf-count" class="muted"></span>
+      <button class="ghost" id="shelf-refresh">刷新</button>
+      <button class="ghost" id="local-import">＋ 导入本地 TXT</button>
+      <button class="ghost" id="group-add">＋ 新建分组</button>
+    </div>
+    <div class="chips" id="shelf-groups"></div>
+    <div class="grid" id="shelf-list"></div>
+    <div class="empty onboarding" id="shelf-empty">
+      <div id="onboard-body"></div>
+    </div>
+  </main>
+
+  <!-- 发现 -->
+  <main class="view" id="view-explore">
+    <div class="toolbar">
+      <select id="explore-source"><option value="">选择书源</option></select>
+      <span class="muted" id="explore-status"></span>
+    </div>
+    <div class="chips" id="explore-kinds"></div>
+    <div class="list" id="explore-list"></div>
+  </main>
+
+  <!-- 搜索 -->
+  <main class="view" id="view-search">
+    <div class="toolbar">
+      <input id="search-key" placeholder="输入书名或作者，回车搜索" autocomplete="off">
+      <select id="search-source"><option value="">全部启用书源</option></select>
+      <button class="primary" id="search-btn">搜索</button>
+    </div>
+    <div class="muted" id="search-status"></div>
+    <div class="list" id="search-list"></div>
+  </main>
+
+  <!-- 书源 -->
+  <main class="view" id="view-source">
+    <div class="toolbar">
+      <span class="muted">粘贴书源 JSON（单个对象或数组），或从 legado 导出的书源文件复制过来</span>
+    </div>
+    <textarea id="source-input" placeholder='[{"bookSourceUrl":"https://example.com","bookSourceName":"示例源","searchUrl":"/search?key={{key}}","ruleSearch":{...}}]'></textarea>
+    <div class="toolbar">
+      <button class="primary" id="source-import">导入书源</button>
+      <button class="primary" id="source-store">书源仓库</button>
+      <button class="ghost" id="source-check">检测书源</button>
+      <button class="ghost" id="source-export">导出书源</button>
+      <button class="ghost" id="source-refresh">刷新列表</button>
+      <span class="muted" id="source-status"></span>
+    </div>
+    <div class="toolbar" id="source-filters">
+      <input id="source-kw" placeholder="筛选书源（名称或地址）" style="width:230px">
+      <span class="muted" id="source-filter-status"></span>
+      <span style="flex:1"></span>
+      <span class="muted" id="source-batch-status"></span>
+      <button class="ghost" id="source-enable-all">批量启用</button>
+      <button class="ghost" id="source-disable-all">批量停用</button>
+      <button class="ghost" id="source-delete-all">批量删除</button>
+    </div>
+    <div class="chips" id="source-groups"></div>
+    <div class="list" id="source-list"></div>
+  </main>
+
+  <!-- 净化（替换规则） -->
+  <main class="view" id="view-replace">
+    <div class="toolbar">
+      <span class="muted">按正则替换正文里的广告/水印。启用的规则会在阅读时自动应用。</span>
+    </div>
+    <div class="replace-form">
+      <input id="rep-name" placeholder="规则名称（可留空）">
+      <input id="rep-pattern" placeholder="查找内容，正则，例如：请记住本站.*?最快更新">
+      <input id="rep-replacement" placeholder="替换为（留空表示删除）">
+      <button class="primary" id="rep-add">添加规则</button>
+      <label class="row" style="color:var(--text)"><input type="checkbox" id="rep-scope-title"> 也作用于标题</label>
+    </div>
+    <div class="muted" id="replace-status"></div>
+    <div class="list" id="replace-list"></div>
+  </main>
+
+  <!-- 订阅 -->
+  <main class="view" id="view-rss">
+    <div class="toolbar">
+      <select id="rss-source"><option value="">选择订阅源</option></select>
+      <button class="ghost" id="rss-import">导入订阅源</button>
+      <button class="ghost" id="rss-refresh">刷新</button>
+      <span class="muted" id="rss-status"></span>
+    </div>
+    <div class="chips" id="rss-sorts"></div>
+    <div class="list" id="rss-list"></div>
+  </main>
+
+  <!-- 同步 / 备份 -->
+  <main class="view" id="view-sync">
+    <div class="toolbar">
+      <span class="muted">备份与恢复用户数据（书源 / 书架 / 进度 / 设置 / 订阅）。恢复采用合并语义，不会覆盖已有数据。</span>
+    </div>
+    <div class="toolbar">
+      <button class="primary" id="bk-local">导出到本地文件</button>
+      <button class="ghost" id="bk-import">从本地文件恢复</button>
+      <input type="file" id="bk-file" accept="application/json" style="display:none">
+      <span class="muted" id="bk-status"></span>
+    </div>
+
+    <div class="divider" style="max-width:760px">WebDAV 同步</div>
+    <div class="replace-form" style="grid-template-columns:1fr 1fr;">
+      <input id="dav-name" placeholder="名称（如 我的坚果云）">
+      <input id="dav-url" placeholder="WebDAV 地址，如 https://dav.jianguoyun.com/dav/legado">
+      <input id="dav-user" placeholder="用户名">
+      <input id="dav-pass" type="password" placeholder="密码（留空表示不修改）">
+      <button class="primary" id="dav-save">保存配置</button>
+      <button class="ghost" id="dav-backup">备份到 WebDAV</button>
+      <button class="ghost" id="dav-restore">从 WebDAV 恢复</button>
+    </div>
+    <div class="muted" id="dav-status"></div>
+  </main>
+
+  <!-- 主题 -->
+  <main class="view" id="view-theme">
+    <div class="toolbar">
+      <div class="seg" id="theme-daynight">
+        <button class="seg-btn active" data-night="0">日间</button>
+        <button class="seg-btn" data-night="1">夜间</button>
+      </div>
+      <span class="muted" id="theme-status"></span>
+    </div>
+
+    <div class="theme-layout">
+      <div class="theme-list" id="theme-list"></div>
+
+      <div class="theme-editor">
+        <div class="theme-editor-head">
+          正在编辑：<b id="theme-editing">—</b>
+          <span class="muted" id="theme-editing-kind"></span>
+        </div>
+        <div class="color-grid" id="color-grid"></div>
+        <div class="toolbar" style="margin-top:6px">
+          <button class="primary" id="theme-saveas">另存为新主题</button>
+          <button class="ghost" id="theme-reset2">恢复默认配色</button>
+          <button class="ghost" id="theme-reload">放弃改动</button>
+        </div>
+        <p class="muted" style="max-width:560px">
+          改动会立即生效并写入配置目录。选中左侧主题可整体套用；
+          「另存为新主题」把当前配色存下来，方便在几套之间切换。
+        </p>
+      </div>
+
+      <div class="theme-preview">
+        <div class="preview-card">
+          <div class="preview-bar">
+            <span class="preview-dot"></span>
+            <span class="preview-dot"></span>
+            <span class="preview-dot"></span>
+            <span class="preview-title">预览</span>
+          </div>
+          <div class="preview-body">
+            <h3>第一章 百世书</h3>
+            <p>吕阳站在补天峰顶，望着远处翻涌的云海。修仙一途，从来都是逆水行舟，不进则退。</p>
+            <p>他想起初入圣宗时的种种，心中百感交集。<span class="preview-muted">（这是次要文字）</span></p>
+            <div class="preview-panel">
+              <span>面板底色</span>
+              <button class="preview-btn">强调色按钮</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- 书源校验 -->
+  <div class="reader" id="check-view">
+    <div class="reader-bar">
+      <button class="ghost" id="check-back">← 返回</button>
+      <div class="reader-title">书源检测</div>
+      <div class="reader-actions">
+        <input id="check-key" placeholder="检测用关键词" value="测试" style="width:150px">
+        <button class="primary" id="check-run">开始检测</button>
+      </div>
+    </div>
+    <div class="reader-body">
+      <div class="toolbar" style="max-width:900px;margin:0 auto 12px">
+        <span class="muted" id="check-status"></span>
+        <span style="flex:1"></span>
+        <button class="ghost" id="check-disable-bad" disabled>停用全部失效</button>
+        <button class="ghost" id="check-delete-bad" disabled>删除全部失效</button>
+      </div>
+      <div id="check-list" class="store-list"></div>
+    </div>
+  </div>
+
+  <!-- 书源仓库（从 Yiove 搜索并导入书源） -->
+  <div class="reader" id="store-view">
+    <div class="reader-bar">
+      <button class="ghost" id="store-back">← 返回</button>
+      <div class="reader-title">书源仓库</div>
+      <div class="reader-actions">
+        <div class="seg" id="store-type">
+          <button class="seg-btn active" data-stype="book-sources">书源</button>
+          <button class="seg-btn" data-stype="book-source-collections">合集</button>
+        </div>
+        <input id="store-key" placeholder="搜索书名 / 站点 / 书源名" style="width:210px">
+        <button class="primary" id="store-search">搜索</button>
+      </div>
+    </div>
+    <div class="reader-body">
+      <div class="muted" id="store-status" style="max-width:900px;margin:0 auto 12px"></div>
+      <div id="store-list" class="store-list"></div>
+    </div>
+  </div>
+
+  <!-- 阅读历史 -->
+  <main class="view" id="view-history">
+    <div class="toolbar">
+      <span class="muted" id="history-status"></span>
+      <button class="ghost" id="history-refresh">刷新</button>
+    </div>
+    <div class="list" id="history-list"></div>
+  </main>
+
+  <!-- 音视频播放（书源类型 1=音频 / 4=视频） -->
+  <div class="reader" id="video-view">
+    <div class="reader-bar">
+      <button class="ghost" id="video-back">← 返回</button>
+      <div class="reader-title" id="video-title"></div>
+      <div class="reader-actions">
+        <button class="ghost" id="video-toc">目录</button>
+        <button class="ghost" id="video-prev">上一集</button>
+        <span class="muted" id="video-pos"></span>
+        <button class="ghost" id="video-next">下一集</button>
+      </div>
+    </div>
+    <div class="reader-body video-body" id="video-body">
+      <div id="media-slot"></div>
+      <div class="muted" id="video-hint" style="text-align:center;padding:14px"></div>
+    </div>
+    <aside class="panel-right" id="video-toc-panel">
+      <div class="toc-head">目录 <button class="ghost" id="video-toc-close">×</button></div>
+      <div class="toc-list" id="video-toc-list"></div>
+    </aside>
+  </div>
+
+  <!-- 漫画阅读 -->
+  <div class="reader" id="manga-view">
+    <div class="reader-bar">
+      <button class="ghost" id="manga-back">← 返回</button>
+      <div class="reader-title" id="manga-title"></div>
+      <div class="reader-actions">
+        <button class="ghost" id="manga-toc">目录</button>
+        <button class="ghost" id="manga-prev">上一话</button>
+        <span class="muted" id="manga-pos"></span>
+        <button class="ghost" id="manga-next">下一话</button>
+      </div>
+    </div>
+    <div class="reader-body manga-body" id="manga-body">
+      <div id="manga-pages"></div>
+    </div>
+    <aside class="panel-right" id="manga-toc-panel">
+      <div class="toc-head">目录 <button class="ghost" id="manga-toc-close">×</button></div>
+      <div class="toc-list" id="manga-toc-list"></div>
+    </aside>
+  </div>
+
+  <!-- 书源调试 -->
+  <div class="reader" id="debug-view">
+    <div class="reader-bar">
+      <button class="ghost" id="debug-back">← 返回</button>
+      <div class="reader-title" id="debug-title">书源调试</div>
+      <div class="reader-actions">
+        <input id="debug-key" placeholder="调试关键词" style="width:150px">
+        <button class="ghost" id="debug-run">重新调试</button>
+      </div>
+    </div>
+    <div class="reader-body">
+      <pre id="debug-log" class="debug-log"></pre>
+    </div>
+  </div>
+
+  <!-- 阅读器 -->
+  <div class="reader" id="reader">
+    <div class="reader-bar">
+      <button class="ghost" id="reader-back">← 返回</button>
+      <div class="reader-title" id="reader-book"></div>
+      <div class="reader-actions">
+        <button class="ghost" id="reader-toc">目录</button>
+        <button class="ghost" id="reader-dict">词典</button>
+        <button class="ghost" id="reader-change">换源</button>
+        <button class="ghost" id="reader-speak">朗读</button>
+        <button class="ghost" id="reader-bookmark">书签</button>
+        <button class="ghost" id="reader-settings">设置</button>
+        <button class="ghost" id="reader-theme">主题</button>
+      </div>
+    </div>
+    <div class="reader-body" id="reader-body">
+      <h2 id="reader-chapter"></h2>
+      <div id="reader-content" class="content"></div>
+      <div class="reader-nav">
+        <button class="ghost" id="reader-prev">上一章</button>
+        <span class="muted" id="reader-pos"></span>
+        <button class="ghost" id="reader-next">下一章</button>
+      </div>
+    </div>
+
+    <!-- 朗读控制条 -->
+    <div class="tts-bar" id="tts-bar">
+      <button class="ghost" id="tts-toggle">⏸ 暂停</button>
+      <button class="ghost" id="tts-stop">⏹ 停止</button>
+      <span class="tts-sep"></span>
+      <label>语速 <input type="range" id="tts-rate" min="5" max="20" step="1" value="10">
+        <output id="tts-rate-out">1.0</output></label>
+      <label>音色
+        <select id="tts-voice"></select>
+      </label>
+      <label class="row"><input type="checkbox" id="tts-auto-next" checked> 读完自动下一章</label>
+      <button class="ghost" id="tts-close">×</button>
+    </div>
+    <aside class="toc" id="toc-panel">
+      <div class="toc-head">目录 <button class="ghost" id="toc-close">×</button></div>
+      <div class="toc-list" id="toc-list"></div>
+    </aside>
+
+    <aside class="panel-right" id="settings-panel">
+      <div class="toc-head">阅读设置 <button class="ghost" id="settings-close">×</button></div>      <div class="settings">
+        <label>字号 <output id="out-fontsize">18</output> px
+          <input type="range" id="set-fontsize" min="12" max="34" step="1">
+        </label>
+        <label>行距 <output id="out-lineheight">1.9</output>
+          <input type="range" id="set-lineheight" min="12" max="32" step="1">
+        </label>
+        <label>段间距 <output id="out-para">1.0</output> em
+          <input type="range" id="set-para" min="0" max="20" step="1">
+        </label>
+        <label class="row">
+          <input type="checkbox" id="set-indent"> 段落缩进
+        </label>
+        <label class="row">
+          <input type="checkbox" id="set-justify"> 两端对齐
+        </label>
+        <p class="muted" style="margin-top:18px">设置会写入配置目录，重启后仍然生效。</p>
+
+        <div class="divider">外观</div>
+        <button class="ghost" id="set-open-theme" style="width:100%">打开主题编辑（更多配色）</button>
+      </div>
+    </aside>
+
+    <aside class="panel-right" id="bookmark-panel">
+      <div class="toc-head">书签 <button class="ghost" id="bookmark-close">×</button></div>
+      <div class="settings" style="padding-top:14px">
+        <button class="primary" id="bookmark-add" style="width:100%">＋ 为当前章节加书签</button>
+      </div>
+      <div class="toc-list" id="bookmark-list"></div>
+    </aside>
+
+    <aside class="panel-right" id="change-panel">
+      <div class="toc-head">换源 <button class="ghost" id="change-close">×</button></div>
+      <div class="settings" style="padding-top:12px">
+        <div class="muted" id="change-status">在当前书源之外寻找同一本书…</div>
+      </div>
+      <div class="toc-list" id="change-list"></div>
+    </aside>
+
+    <aside class="panel-right" id="dict-panel">
+      <div class="toc-head">词典 <button class="ghost" id="dict-close">×</button></div>
+      <div class="settings" style="padding-top:12px">
+        <input id="dict-word" placeholder="输入要查的词" style="width:100%">
+        <div class="toolbar" style="margin:10px 0 0">
+          <button class="primary" id="dict-query" style="flex:1">查询</button>
+        </div>
+        <div class="muted" id="dict-status" style="margin-top:10px"></div>
+      </div>
+      <div class="toc-list" id="dict-results" style="padding:0 14px 14px"></div>
+    </aside>
+  </div>
+
+  <!-- 文章阅读（订阅源用） -->
+  <div class="reader" id="article-reader">
+    <div class="reader-bar">
+      <button class="ghost" id="article-back">← 返回</button>
+      <div class="reader-title" id="article-title"></div>
+      <div class="reader-actions">
+        <button class="ghost" id="article-settings">设置</button>
+        <button class="ghost" id="article-theme">主题</button>
+      </div>
+    </div>
+    <div class="reader-body" id="article-body">
+      <h2 id="article-heading"></h2>
+      <div class="muted" id="article-meta" style="max-width:720px;margin:0 auto 20px"></div>
+      <div id="article-content" class="content"></div>
+    </div>
+  </div>
+</div>
+<script src="/app.js"></script>
+</body>
+</html>
