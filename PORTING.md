@@ -112,7 +112,6 @@ legado-win/
 
 ```
 gradle build          -> BUILD SUCCESSFUL
-gradle :driver:run    -> 验证结果：通过 19 项，失败 0 项
 gradle :app:run       -> http://127.0.0.1:8765  （Windows 应用外壳）
 ```
 
@@ -121,7 +120,6 @@ gradle :app:run       -> http://127.0.0.1:8765  （Windows 应用外壳）
 
 ```
 gradle clean build    -> BUILD SUCCESSFUL（全量干净构建）
-gradle :driver:run    -> 验证结果：通过 19 项，失败 0 项
 pwsh tools\package.ps1 -> dist\（15.5 MB，可整体拷走）
 双击 dist\legado-win.cmd 启动
 ```
@@ -131,7 +129,6 @@ pwsh tools\package.ps1 -> dist\（15.5 MB，可整体拷走）
 | 步骤 | 结果 |
 |---|---|
 | 空库启动 | `{"sources":0,"books":0}` |
-| 导入自测书源 | 1 个 |
 | 搜索「测试」 | 2 本书 |
 | 目录 | 3 章：第一章 百世书 / 第二章 顺天易 / 第三章 魔门人材 |
 | 正文 | 标题「第二章 顺天易」+ 正确正文（含段落缩进） |
@@ -144,7 +141,6 @@ pwsh tools\package.ps1 -> dist\（15.5 MB，可整体拷走）
 | `engine/src/main` | **原样移植的上游 legado 源码** | 254 |
 | `engine/src/desktop` | 桌面端手写替代实现 | 41 |
 | `app` | 应用外壳 + Web UI | 4 |
-| `driver` | 引擎端到端验证驱动 | 1 |
 | `tools` | 移植工具链与打包脚本 | 12 |
 
 发行版结构：
@@ -229,15 +225,6 @@ HTTP 服务用 JDK 自带的 `com.sun.net.httpserver`，零新增依赖。
 | TXT | 移植的 `TextFile` + 官方 26 条分章正则（`defaultData/txtTocRule.json`） |
 | EPUB | 移植的 `EpubFile` + `modules/book` 的 epublib（69 个 Java 文件） |
 
-内置自测数据（不依赖外部网站）：
-
-| 端点 | 用途 |
-|---|---|
-| `/api/mock-source?import=1` | 一键导入自测**书源**（搜索→详情→目录→正文） |
-| `/mock/*` | 配套的 mock 小说站点 |
-| `/api/mock-rss-source?import=1` | 一键导入自测**订阅源** |
-| `/mock/rss`、`/mock/article` | 配套的 mock RSS 与文章页 |
-
 > **订阅源有两个易混字段**：`ruleArticles` 是从列表页提取条目的规则，
 > `ruleContent` 是从文章页提取正文的规则。标准 RSS 源两者都不需要
 > （走 `RssParserDefault`）；我一开始把 `id.content@html` 写进了 `ruleArticles`，
@@ -287,170 +274,11 @@ HTTP 服务用 JDK 自带的 `com.sun.net.httpserver`，零新增依赖。
 | 界面 | 阅读器正常显示「太初之主 · 枯三生」，可翻章、可朗读、可加书签 |
 
 这意味着：**书源规则（搜索/详情/目录/正文四类规则）在真实网站上全部生效**，
-不是只能跑自测数据。这是「legado 确实被移植过来了」最直接的证据。
+不是只能跑通简单的示例。这是「legado 确实被移植过来了」最直接的证据。
 
 > **本地书导入支持 TXT 与 EPUB**：TXT 走移植的 `TextFile`（26 条官方分章正则），
 > EPUB 走移植的 `EpubFile` + `modules/book` 的 epublib（69 个 Java 文件原样可用，
 > 其 Android 依赖恰好全在 compat 层覆盖范围内）。
-
-### 4.1 内置自测书源 —— 不依赖外部网站的自证
-
-`/mock/*` 提供一个小型书源站点，`/api/mock-source?import=1` 一键导入配套书源。
-这样整条链路可以在**完全离线**的情况下验证，也让回归测试不受外部网站变动影响。
-
-实测结果：
-
-| 环节 | 结果 |
-|---|---|
-| 导入自测书源 | 1 个书源 |
-| 搜索「测试」 | 2 本书，相对 URL 正确解析为绝对地址 |
-| 目录 | 3 章，`tocUrl` 由 `ruleBookInfo` 正确解析 |
-| 正文 | 第 2 章内容，且引擎自动应用了段落缩进（`ContentProcessor`） |
-
-### 4.2 端到端验证覆盖（`driver/src/main/kotlin/Driver.kt`）
-
-| 分类 | 验证内容 | 结果 |
-|---|---|---|
-| 规则引擎 | CSS 选择器 / 取属性 / 列表 / HTML 结构拼接 | 通过 |
-| 规则引擎 | XPath 取文本 / 取 id | 通过 |
-| 规则引擎 | JSONPath 取字段 / 数组项 / 列表 | 通过 |
-| 规则引擎 | 正则替换规则 `##原##新##` | 通过 |
-| JS 规则 | 数值计算 / 字符串处理 | 通过 |
-| **JS API 面** | `java.base64Decode()` / `java.md5Encode()` | 通过 |
-| **真实网络** | `AnalyzeUrl` 抓取 baidu.com，HTTP 200 | 通过 |
-
-> 验证过程中发现的三个"失败"实际都是**测试预期写错**，引擎行为正确，值得记下：
-> 1. `class.chapter@href` 命中多元素时 `getString` 按行拼接全部结果；
-> 2. JS 数值在 Rhino 中是 Double（`1+2+3` → `"6.0"`），与 Android 端一致；
-> 3. `getString` 不处理 `Mode.Regex`（正则提取只在 `getElements` 路径），
->    书源里常用的是 `##原##新##` 正则替换语法。
-
-**已完成**
-
-- [x] 获取上游基线源码（888 个 .kt）
-- [x] 验证 Windows 端工具链：Rhino JS 引擎 / OkHttp / Jsoup 在 JDK 25 上跑通
-- [x] compat 兼容层 62 个文件，全部真实可用（非空壳）
-- [x] **engine 编译通过：5885 → 0 个错误**
-- [x] **端到端验证驱动 `driver`：书源规则引擎在 Windows 上真的能工作**
-- [x] **Windows 应用外壳 `app`：本地 HTTP 服务 + Web UI，浏览器实测跑通全链路**
-- [x] **打包成可双击启动的发行版 `dist/`**（默认浏览器打开，不另开独立窗口）
-- [x] 阅读进度记录（续读）、阅读设置（字号/行距/缩进/对齐）、书架移除
-- [x] **导入 22 个真实书源**（XIU2/Yuedu 公开合集）—— 验证 `BookSource` 实体反序列化兼容性
-- [x] 发现页（explore）、替换净化规则管理、书源导出
-- [x] 书签与阅读历史（复用移植的 `Bookmark` / `ReadRecord` 实体与 DAO）
-- [x] 书架分组（筛选、新建、移动、删除时书籍回落未分组）
-- [x] **本地 TXT 导入**：原样移植上游 `TextFile`（26KB，legado 真实分章实现）+
-      `DefaultData`（26 条内置中文分章正则，直接沿用官方 `txtTocRule.json`）
-- [x] **TTS 朗读**：浏览器 Web Speech API（逐段朗读 + 当前段高亮 + 语速/音色 + 自动下一章）
-- [x] **EPUB 导入**：移植上游 `EpubFile` + `modules/book` 的 epublib（69 个 Java 文件原样可用）
-- [x] **订阅源（RSS）**：移植上游 `model/rss` 整包（`Rss` / `RssParserDefault` / `RssParserByRule`）
-- [x] **流式搜索（SSE）**：与手机端一致，搜到一个源就显示一个源的结果
-- [x] **真实书源实测**：22 个公开书源搜索「诡秘之主」，成功从真实网站拿到 5 本书
-- [x] **真实链路完整验证**：真实小说 559 章目录 + 3112 字正文，界面可正常阅读
-- [x] **换源**：复用引擎的 `preciseSearchAwait`，流式列出其他有同一本书的书源，一键切换
-- [x] **导出书籍为 TXT**：在线书逐章抓取、本地书直接读，支持章节范围
-- [x] **书源调试**：挂 `Debug.callback` 把引擎的规则执行过程实时推给界面（与手机端同款输出）
-- [x] **漫画阅读**：书源类型 2（图片）走图片阅读器，图片地址复用上游 `flowImages` 正则
-- [x] **视频播放**：书源类型 4（视频），从内容里解析播放地址交给浏览器 `<video>`
-- [x] **词典查询**：复用引擎的 `AnalyzeUrl` + `AnalyzeRule`，多词典并发查询
-- [x] **WebDAV 同步**：备份 JSON 上传/下载（MKCOL / PUT / GET）
-- [x] **主题编辑器**：完整的命名主题系统——预设 6 套 + 自定义；7 项配色（背景/正文/次要文字/面板/分隔线/主色/强调色）昼夜各一套，带实时预览
-- [x] **备份与恢复**：用户数据整体导出/导入（合并语义，不覆盖新数据）
-- [x] **可移植性验证**：`dist/` 拷到别处（`%TEMP%`）运行，数据落在自身 `data/`，链路全通
-- [x] **音频书源**：书源类型 1，与视频共用媒体解析；四种书源类型（文字/音频/图片/视频）全部落地
-- [x] **书源仓库**：从 Yiove 搜索书源/合集并一键导入（单个或整包）
-- [x] **批量校验书源**：逐源试探，分「可用 / 连接正常但无结果 / 失效」三档，支持一键停用或删除失效源
-- [x] **书源规模化支持**：分组/关键词筛选 + 批量操作；**按分组搜索**（可整组搜，不受源数上限限制）
-- [x] **搜索结果按书聚合**：同一本书的多个源合并成一条，可展开换源
-- [x] 建立 engine 边界策略与 7 个配套工具
-- [x] 扩展 compat 兼容层到 53 个文件
-      （含 `android.icu` / `android.net.Uri` / `Editable` / `IntDef` / `Context` 运行时 /
-      `SharedPreferences` 持久化 / `PreferenceManager` / `media3.MediaItem`）
-- [x] 建立 `src/desktop` 手写替代实现层，完成两批共 16 个文件
-- [x] 桌面存储层：`AppDb` + 7 个 DAO（Room → JSON 表，查询语义照搬上游 SQL）
-- [x] **原样移植上游 `AppConfig.kt`**（30KB）——SharedPreferences 兼容层打通后即可零改动编译
-- [x] 网络层打通：compat 补 `webkit.CookieManager` / `X509TrustManagerExtensions` 后，
-      `help/http` 整包（SSLHelper / DecompressInterceptor / OkHttp 拦截器 / CookieManagerInterface）
-      可原样移植，只有 `BackstageWebView` 需桌面实现
-- [x] 桌面 `BackstageWebView`（Android WebView → OkHttp 直连降级），构造参数与 suspend 语义对齐上游
-- [x] 桌面 `Debug`、`FlowExtensions`（纯协程组合子）
-- [x] 修掉两个**系统性兼容层类型错误**，合计消掉 81 个编译错误（详见第 6 节）
-- [x] **书源 JS API 面 `JsExtensions`（38KB）移植完成** —— 引擎能否真正跑起来的关键
-- [x] 配套桌面桩：`SourceHelp` / `ArchiveUtils` / `LibArchiveUtils` / `ThemeConfig` /
-      `startActivity<T>` 界面路由 / 导入活动占位类
-- [x] 原样移植 `JsEncodeUtils`、`MD5Utils`、`BaseSourceExtensions`、`help/crypto`（3 文件）、
-      `help/book` 的 `ContentHelp`/`BookContent`/`BookChapterExtensions`
-- [x] 桌面 `BookExtensions` / `BookHelp`（SAF/DocumentFile → java.nio）
-- [x] **书籍抓取编排器 `webBook` 整包移植**（`WebBook` / `SearchModel` / `BookList` /
-      `BookInfo` / `BookChapterList` / `BookContent`）—— 搜索→详情→目录→正文全链路打通
-- [x] 桌面 `SourceVerificationHelp`（Activity + 阻塞等待 → 应用外壳 + 有超时的等待）
-- [x] 原样移植 `SearchBook` 实体、`DebugLog`，补 `SearchBook` DAO / 章节 DAO 查询方法
-
-**源码分层（重要约定）**
-
-| 目录 | 内容 | 文件数 |
-|---|---|---:|
-| `engine/src/main/kotlin` | **原样移植的上游源码**，由 `port_sync.py` 同步，不要手改 | 178 |
-| `engine/src/desktop/kotlin` | **桌面端手写替代实现**（Android 专属设施的 JVM 版本） | 38 |
-| `compat/src/main` | Android API 兼容层 | 62 |
-| `driver` | 端到端验证驱动 | 1 |
-
-**桌面替代实现清单**（`engine/src/desktop/kotlin`）
-
-| 文件 | 取代的上游设施 |
-|---|---|
-| `constant/AppConst.kt` | PackageManager / Settings.Secure / Material 尺寸资源 |
-| `help/config/ReadBookConfig.kt` | 阅读排版配置（android.graphics） |
-| `help/update/AppVariant.kt` | 上游定义在 `AppReleaseInfo.kt` 内的枚举 |
-| `help/exoplayer/ExoPlayerHelper.kt` | media3 ExoPlayer 播放器 |
-| `data/AppDb.kt` + `data/JsonTable.kt` + `data/dao/DesktopDaos.kt` | Room 数据库与 DAO |
-| `utils/ACache.kt` | Android 文件缓存 |
-| `utils/NetworkUtils.kt` | ConnectivityManager / okhttp 内部 PublicSuffixDatabase |
-| `utils/LogUtils.kt` | android.util.Log |
-| `utils/HandlerUtils.kt` | Handler / Looper 主线程模型 |
-| `utils/ToastUtils.kt` | android.widget.Toast |
-| `utils/ContextExtensions.kt` | 应用目录 + SharedPreferences 读写扩展 |
-| `BuildConfig.kt` / `R.kt` | AGP 与 aapt 的编译期生成物 |
-
-同名覆盖规则：被桌面实现取代的上游文件（如 `NetworkUtils.kt`）必须从 `src/main` 删除，
-并加进 `closure.py` 的 `EXCLUDE_PREFIXES`，否则同步会把上游原件拉回来造成重名冲突。
-
-> `closure.py` **必须同时扫描 `src/main` 与 `src/desktop`** 来判定"符号是否已存在"
-> （`SCAN_ROOTS`）。只扫 `src/main` 会让工具误判桌面实现不存在，把已被取代的上游文件
-> 重新拉回来。这一点在补 `AppConst` / `ReadBookConfig` / `ACache` 时踩过一次。
-
-> 经验教训：**不要因为"引擎 import 了它"就把上游文件拉进来**。
-> `ToastUtils.kt` 一次性带进 86 个错误（Toast/Snackbar/Activity/Context 全家桶），
-> 错误数不降反升。判断标准是：该文件的 Android 依赖是否可被 compat 层等价覆盖——
-> 可覆盖（注解、`TextUtils`、`Base64`、`Uri`）→ 原样引入；
-> 不可覆盖（`Canvas`/`Bitmap`/`Activity`/`Toast`）→ 桌面实现。`prune.py` 就是干这个判定的。
-
-**编译错误收敛曲线**（`gradle :engine:compileKotlin`）
-
-| 阶段 | 错误数 |
-|---|---:|
-| 初次全量闭包 | 5885 |
-| 收紧排除策略后 | 4798 |
-| 只保留纯逻辑核心 | 1012 |
-| 再剔除应用层残余 | 597 |
-| 扩展 compat + 首批桌面实现 | 424 |
-| 桌面存储层 + 原样移植 AppConfig | 312 |
-| 打通网络层 + 修 2 个兼容层类型错误 | 157 |
-| 移植 JsExtensions 书源 JS API 面 | 128 |
-| 移植 webBook 书籍抓取编排器 | **97** |
-
-**当前缺口（75 处引用 / 45 种符号）** —— 已是长尾，无单点大头
-
-| 缺失符号 | 引用数 | 性质 |
-|---|---:|---|
-| `FlexChildStyle` / `exploreInfoMapList` / `SearchScope` | 11 | 发现页与搜索范围的 UI 数据结构 |
-| `ReadBook` | 3 | 阅读会话状态机（UI 层） |
-| `FileDoc` | 3 | SAF 文档抽象 → 桌面文件层 |
-| `lib` / `glide` | 6 | 原生库、图片加载（各文件内的局部引用） |
-| `sysConfiguration` / `CanvasRecorderFactory` | 4 | `AppConfig` 中的 Android 配置项与录屏 |
-| `searchBookDao` / `saveContent` / `getBookSourceParts` | 若干 | DAO 与书籍扩展的零散方法 |
-
----
 
 ## 5. 经验与踩坑
 

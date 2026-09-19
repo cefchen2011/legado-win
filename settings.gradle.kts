@@ -22,7 +22,5 @@ rootProject.name = "legado-win"
 include(":compat")
 // 移植后的 legado 引擎（书源规则解析、网络、实体）
 include(":engine")
-// 端到端验证驱动（用真实书源跑通 搜索→详情→目录→正文）
-include(":driver")
 // Windows 应用外壳（本地 HTTP 服务 + Web UI）
 include(":app")

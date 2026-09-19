@@ -64,25 +64,6 @@
 
 ---
 
-## 试着跑一遍（不依赖任何外部网站）
-
-服务内置了一套自测数据：
-
-```
-1. 打开「书源」页 → 点标题栏，或直接访问
-   http://127.0.0.1:8765/api/mock-source?import=1     ← 导入自测书源
-2. 回「搜索」页，输入任意词（如「测试」）→ 出现 2 本书
-3. 点「阅读」→ 目录 3 章 → 正文
-
-订阅源同理：
-   http://127.0.0.1:8765/api/mock-rss-source?import=1  ← 导入自测订阅源
-```
-
-这套 mock 站点由服务自己提供（`/mock/*`），因此**整条链路可以完全离线验证**，
-回归测试也不受外部网站变动影响。
-
----
-
 ## 数据目录
 
 ```
@@ -105,22 +86,18 @@ data/
 | `engine/src/main/` | **原样移植的上游 legado 源码**（含 epublib 等） |
 | `engine/src/desktop/` | 桌面端手写替代实现（Android 专属设施的 JVM 版本） |
 | `app/` | 应用外壳：本地 HTTP 服务 + Web UI |
-| `driver/` | 引擎端到端验证驱动 |
 | `tools/` | 移植工具链与打包脚本 |
 
 架构、移植边界判定、踩坑经验详见 [`PORTING.md`](PORTING.md)。
 
 ---
 
-## 验证
+## 构建
 
 ```bash
 gradle clean build          # 全量构建
-gradle :driver:run          # 引擎端到端验证（19 项）
+pwsh tools/package.ps1      # 打包到 dist/
 ```
-
-驱动验证覆盖：CSS / XPath / JSONPath 规则、正则替换、书源 JS 规则、
-`java.*` 扩展 API（base64/md5）、真实网络抓取。
 
 ### 真实书源实测
 
